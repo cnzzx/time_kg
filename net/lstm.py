@@ -1,4 +1,3 @@
-from pyexpat import model
 import torch
 import torch.nn as nn
 
@@ -15,11 +14,12 @@ class LSTM_Model(nn.Module):
         self.input_step_len = input_step_len
         self.output_step_len = output_step_len
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers)
-        self.fc = nn.Linear(input_step_len * hidden_size, output_step_len)
+        self.fc = nn.Linear(input_step_len, output_step_len)
     
     def forward(self, x):
         out, (h, c) = self.lstm(x)
-        h_T = torch.transpose(h, 0, 2)
-        r_T = self.fc(h_T)
+        out_T = torch.transpose(out, 0, 2)
+        print(out_T.size())
+        r_T = self.fc(out_T)
         r = torch.transpose(r_T, 0, 2)
         return r

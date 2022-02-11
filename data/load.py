@@ -1,5 +1,6 @@
 import re
 import csv
+from pandas import Period
 import torch
 
 def number_format_normalize(num):
@@ -26,9 +27,9 @@ def get_absolute_date(year, month, day):
     return result
 
 
-def load_nasdaq100():
+def load_data(path, name):
     """
-    Load the NASDQ-100 data.
+    Load data.
     Only the date and closing price are counted.
     Return a 2-d list, where each line is a sample point in the following form:
 
@@ -38,7 +39,7 @@ def load_nasdaq100():
 
     The absolute date is the offset from '2000-01-01'.
     """
-    reader = csv.reader(open('data/dataset/nasdaq100.csv', 'r', encoding='utf-8'))
+    reader = csv.reader(open(path, 'r', encoding='utf-8'))
     result = []
     pass_first_line = True
     for item in reader:
@@ -47,57 +48,7 @@ def load_nasdaq100():
             continue
         date = re.split('[年月日]', item[0])
         result.insert(0, [get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
-    print('MASDQ-100 data, {} samples loaded.'.format(len(result)))
-    return result
-
-
-def load_dax30():
-    """
-    Load the DAX-30 data.
-    Only the date and closing price are counted.
-    Return a 2-d list, where each line is a sample point in the following form:
-
-    ...
-    [absolute date, value/label]
-    ...
-
-    The absolute date is the offset from '2000-01-01'.
-    """
-    reader = csv.reader(open('data/dataset/dax30.csv', 'r', encoding='utf-8'))
-    result = []
-    pass_first_line = True
-    for item in reader:
-        if pass_first_line:
-            pass_first_line = False
-            continue
-        date = re.split('[年月日]', item[0])
-        result.insert(0, [get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
-    print('DAX-30 data, {} samples loaded.'.format(len(result)))
-    return result
-
-
-def load_shangzheng50():
-    """
-    Load the 上证-50 data.
-    Only the date and closing price are counted.
-    Return a 2-d list, where each line is a sample point in the following form:
-
-    ...
-    [absolute date, value/label]
-    ...
-
-    The absolute date is the offset from '2000-01-01' + 1.
-    """
-    reader = csv.reader(open('data/dataset/shangzheng50.csv', 'r', encoding='utf-8'))
-    result = []
-    pass_first_line = True
-    for item in reader:
-        if pass_first_line:
-            pass_first_line = False
-            continue
-        date = re.split('[年月日]', item[0])
-        result.insert(0, [get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
-    print('上证-50 data, {} samples loaded.'.format(len(result)))
+    print('{} data, {} samples loaded.'.format(name, len(result)))
     return result
 
 
@@ -138,3 +89,14 @@ def data_filter(data, time_gap, time_start=None, time_end=None):
                 avg_total, avg_num = value, 1
                 lst_date = get_time_bucket(date, time_gap)
     return result
+
+
+def make_dataset(values, input_step_len, output_step_len):
+    input_seq, output_seq = [], []
+    n_samples = len(values)
+    for start_idx in range(n_samples):
+        if start_idx + input_step_len + output_step_len - 1 >= n_samples:
+            break
+        input_seq.append(values[start_idx:start_idx+input_step_len])
+        output_seq.append(values[start_idx+input_step_len:start_idx+input_step_len+output_step_len])
+    return input_seq, output_seq

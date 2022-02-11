@@ -13,21 +13,15 @@ def number_format_normalize(num):
     return result
 
 
+MONTH_OFFSET = [0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366]
+
+
 def get_absolute_date(year, month, day):
     """
     For simplicity, assume all February has 29 days.
     """
-    result = (year-2001) * 366
-    if month-1 == 2:
-        result += 29
-    elif (month-1)%2 == 1 and month-1 <= 7:
-        result += 31
-    elif (month-1)%2 == 1 and month-1 > 7:
-        result += 30
-    elif (month-1)%2 == 0 and month-1 <= 7:
-        result += 30
-    else:  # even month larget than 7
-        result += 31
+    result = (year-2000) * 366
+    result += MONTH_OFFSET[month-1]
     result += day
     return result
 
@@ -36,7 +30,7 @@ def load_nasdaq100():
     """
     Load the NASDQ-100 data.
     Only the date and closing price are counted.
-    Return a 2-d tensor, where each line is a sample point in the following form:
+    Return a 2-d list, where each line is a sample point in the following form:
 
     ...
     [absolute date, value/label]
@@ -52,9 +46,8 @@ def load_nasdaq100():
             pass_first_line = False
             continue
         date = re.split('[年月日]', item[0])
-        result.append([get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
-    result = torch.tensor(result)
-    print('MASDQ-100 data, {} samples loaded.'.format(result.size()[0]))
+        result.insert(0, [get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
+    print('MASDQ-100 data, {} samples loaded.'.format(len(result)))
     return result
 
 
@@ -62,7 +55,7 @@ def load_dax30():
     """
     Load the DAX-30 data.
     Only the date and closing price are counted.
-    Return a 2-d tensor, where each line is a sample point in the following form:
+    Return a 2-d list, where each line is a sample point in the following form:
 
     ...
     [absolute date, value/label]
@@ -78,9 +71,8 @@ def load_dax30():
             pass_first_line = False
             continue
         date = re.split('[年月日]', item[0])
-        result.append([get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
-    result = torch.tensor(result)
-    print('DAX-30 data, {} samples loaded.'.format(result.size()[0]))
+        result.insert(0, [get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
+    print('DAX-30 data, {} samples loaded.'.format(len(result)))
     return result
 
 
@@ -88,7 +80,7 @@ def load_shangzheng50():
     """
     Load the 上证-50 data.
     Only the date and closing price are counted.
-    Return a 2-d tensor, where each line is a sample point in the following form:
+    Return a 2-d list, where each line is a sample point in the following form:
 
     ...
     [absolute date, value/label]
@@ -104,10 +96,13 @@ def load_shangzheng50():
             pass_first_line = False
             continue
         date = re.split('[年月日]', item[0])
-        result.append([get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
-    result = torch.tensor(result)
-    print('上证-50 data, {} samples loaded.'.format(result.size()[0]))
+        result.insert(0, [get_absolute_date(eval(date[0]), eval(date[1]), eval(date[2])), number_format_normalize(item[1])])
+    print('上证-50 data, {} samples loaded.'.format(len(result)))
     return result
+
+
+def get_time_bucket(date, time_gap):
+    return (date-1) // time_gap + 1
 
 
 def data_filter(data, time_gap, time_start=None, time_end=None):
@@ -117,31 +112,29 @@ def data_filter(data, time_gap, time_start=None, time_end=None):
     and time_end are absolute dates. If these parameters
     are None object, no filtering applied.
     """
-    n_samples = data.size()[0]
+    n_samples = len(data)
     result = []
     avg_total, avg_num = 0, 0  # for computing the average
-    lst_date = -1000  # the last date cutting point denoted by time_gap
+    lst_date = -1  # the last date cutting point
     for sample_idx in range(n_samples):
         date = data[sample_idx][0]
         value = data[sample_idx][1]
-        if date < time_start:
+        if time_start is not None and date < time_start:
             continue
-        if date > time_end:
+        if time_end is not None and date > time_end:
             break
-        if date-lst_date > time_gap:
-            if lst_date > 0:  # at least one period started
-                if avg_num == 0:
-                    ex = Exception('The time gap is too small.')
-                    raise ex
-                result.append(torch.tensor([lst_date, avg_total/avg_num]))
+        if lst_date > 0 and get_time_bucket(date, time_gap) - lst_date > 1:
+            ex = Exception('The time gap is too small, please reset a proper gap.')
+            raise ex
+        if lst_date < 0:
+            lst_date = get_time_bucket(date, time_gap)
             avg_total, avg_num = value, 1
-            lst_date = date
         else:
-            avg_total += value
-            avg_num += 1
-    if avg_num == 0:
-        ex = Exception('The time span is too short, please reset time_start and time_end')
-        raise ex
-    result.append(torch.tensor([lst_date, avg_total/avg_num]))
-    result = torch.tensor(result)
+            if get_time_bucket(date, time_gap) == lst_date:
+                avg_total += value
+                avg_num += 1
+            else:
+                result.append([lst_date, avg_total/avg_num])
+                avg_total, avg_num = value, 1
+                lst_date = get_time_bucket(date, time_gap)
     return result

@@ -19,7 +19,14 @@ class LSTM_Model(nn.Module):
     def forward(self, x):
         out, (h, c) = self.lstm(x)
         out_T = torch.transpose(out, 0, 2)
-        print(out_T.size())
         r_T = self.fc(out_T)
         r = torch.transpose(r_T, 0, 2)
+        '''
+        print(x.requires_grad)
+        print(out.requires_grad)
+        print(out_T.requires_grad)
+        print(r_T.requires_grad)
+        print(r.requires_grad)
+        print(r.size())
+        '''
         return r

@@ -10,7 +10,7 @@ from net.lstm import LSTM_Model
 # hyper-parameters
 input_size = 1
 hidden_size = 1
-num_layers = 2
+num_layers = 1
 input_step_len = 10
 output_step_len = 10
 eval_ratio = 0.2  # 20 % for evaluation, 80 % for training
@@ -47,7 +47,8 @@ n_eval = eval_input_tensor.size()[1]
 model = LSTM_Model(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, input_step_len=input_step_len, output_step_len=output_step_len)
 
 # training
-optimizer = torch.optim.Adam(params=model.parameters(), lr=0.1)
+# optimizer = torch.optim.Adam(params=model.parameters(), lr=1)
+optimizer = torch.optim.SGD(params=model.parameters(), lr=1)
 loss_func = torch.nn.MSELoss()
 n_batch = (n_train-1) // batch_size + 1
 for epoch_idx in range(n_epochs):
@@ -57,14 +58,17 @@ for epoch_idx in range(n_epochs):
         x = train_input_tensor[:, start_idx:end_idx, :]
         x.requires_grad = True
         y = train_output_tensor[:, start_idx:end_idx, :]
+        y.requires_grad = True
         out = model(x)
         
-        optimizer.zero_grad()
         loss = loss_func(y, out)
+        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        print('train_loss: ', x.grad)
+        # print('train_loss: ', loss.item())
+        # print(x.size(), y.size())
+        print(x.grad)
         break
     break
 

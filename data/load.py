@@ -111,22 +111,12 @@ def get_event_influence(events, k, time_gap, start_bucket=1, end_bucket=None):
     return result
 
 
-def make_dataset(values, input_step_len, output_step_len, event_influence=None, k=1):
-    if event_influence is None:
-        input_seq, output_seq = [], []
-        n_samples = len(values)
-        for start_idx in range(n_samples):
-            if start_idx + input_step_len + output_step_len - 1 >= n_samples:
-                break
-            input_seq.append(values[start_idx:start_idx+input_step_len])
-            output_seq.append(values[start_idx+input_step_len:start_idx+input_step_len+output_step_len])
-        return input_seq, output_seq
-    else:
-        input_seq, output_seq = [], []
-        n_samples = len(values)
-        for start_idx in range(n_samples):
-            if start_idx + input_step_len + output_step_len - 1 >= n_samples:
-                break
-            input_seq.append(values[start_idx:start_idx+input_step_len])
-            output_seq.append(values[start_idx+input_step_len:start_idx+input_step_len+output_step_len])
-        return input_seq, output_seq
+def make_dataset(values, input_step_len, output_step_len, k=1):
+    input_seq, output_seq = [], []
+    n_samples = len(values)
+    for start_idx in range(n_samples):
+        if start_idx + input_step_len + output_step_len - 1 >= n_samples:
+            break
+        input_seq.append(values[start_idx:start_idx+input_step_len])
+        output_seq.append(values[start_idx+input_step_len:start_idx+input_step_len+output_step_len])
+    return input_seq, output_seq

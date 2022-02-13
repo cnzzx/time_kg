@@ -34,8 +34,10 @@ class DotDict(dict):
 import os
 import sys
 sys.path.append(os.path.abspath('.'))
+
+import data.event.process as process
 from net.load_net import gnn_model
-from data.data import LoadData 
+from data.data import LoadData
 
 
 """
@@ -276,6 +278,8 @@ def main():
         config['gpu']['id'] = int(args.gpu_id)
         config['gpu']['use'] = True
     device = gpu_setup(config['gpu']['use'], config['gpu']['id'])
+    # event
+    dates, embeddings, graph_adj, graph_sim = process.get_event_info()
     # model, dataset, out_dir
     if args.model is not None:
         MODEL_NAME = args.model
@@ -370,4 +374,5 @@ def main():
     train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs)
 
 
-main()
+if __name__ == '__main__':
+    main()

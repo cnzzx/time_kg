@@ -1,5 +1,6 @@
 import re
 import csv
+from xmlrpc.client import NOT_WELLFORMED_ERROR
 from pandas import Period
 import torch
 
@@ -91,12 +92,41 @@ def data_filter(data, time_gap, time_start=None, time_end=None):
     return result
 
 
-def make_dataset(values, input_step_len, output_step_len):
-    input_seq, output_seq = [], []
-    n_samples = len(values)
-    for start_idx in range(n_samples):
-        if start_idx + input_step_len + output_step_len - 1 >= n_samples:
+def get_event_influence(events, k, time_gap, start_bucket=1, end_bucket=None):
+    influence_span = int(1 / k)
+    embedding_size = events[0][1].size()
+    result = torch.zeors((end_bucket-start_bucket+1, embedding_size[0]))
+    n_events = len(events)
+    for event_idx in range(n_events):
+        event_bucket = get_time_bucket(events[event_idx][0], time_gap)
+        if start_bucket is not None and event_bucket < start_bucket:
+            continue
+        if end_bucket is not None and event_bucket > end_bucket:
             break
-        input_seq.append(values[start_idx:start_idx+input_step_len])
-        output_seq.append(values[start_idx+input_step_len:start_idx+input_step_len+output_step_len])
-    return input_seq, output_seq
+        event_embedding = events[event_idx][1]
+        for influence_dis in range(influence_span):
+            if event_bucket + influence_dis > end_bucket:
+                break
+            result[event_bucket + influence_dis, :] += (1-k*influence_dis) * event_embedding
+    return result
+
+
+def make_dataset(values, input_step_len, output_step_len, event_influence=None, k=1):
+    if event_influence is None:
+        input_seq, output_seq = [], []
+        n_samples = len(values)
+        for start_idx in range(n_samples):
+            if start_idx + input_step_len + output_step_len - 1 >= n_samples:
+                break
+            input_seq.append(values[start_idx:start_idx+input_step_len])
+            output_seq.append(values[start_idx+input_step_len:start_idx+input_step_len+output_step_len])
+        return input_seq, output_seq
+    else:
+        input_seq, output_seq = [], []
+        n_samples = len(values)
+        for start_idx in range(n_samples):
+            if start_idx + input_step_len + output_step_len - 1 >= n_samples:
+                break
+            input_seq.append(values[start_idx:start_idx+input_step_len])
+            output_seq.append(values[start_idx+input_step_len:start_idx+input_step_len+output_step_len])
+        return input_seq, output_seq

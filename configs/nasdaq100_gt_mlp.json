@@ -4,7 +4,7 @@
         "id": 0
     },
     
-    "model": "GraphTransformer",
+    "model": "GT_MLP",
     "dataset": "nasdaq100",
     
     "out_dir": "out/nasdaq100_gt_mlp/",
@@ -12,7 +12,7 @@
     "params": {
         "seed": 41,
         "epochs": 1000,
-        "batch_size": 128,
+        "batch_size": 1,
         "init_lr": 0.0007,
         "lr_reduce_factor": 0.5,
         "lr_schedule_patience": 15,
@@ -29,7 +29,6 @@
         "out_dim": 64,
         "edge_feat": true,
         "residual": true,
-        "readout": "mean",
         "in_feat_dropout": 0.0,
         "dropout": 0.0,
         "layer_norm": false,

@@ -138,7 +138,7 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
         
 
     # import train and evaluate functions
-    from experiment.train_gt_mlp import train_epoch, evaluate_network
+    from experiment.train_molecules import train_epoch, evaluate_network
 
     train_loader = DataLoader(trainset, batch_size=params['batch_size'], shuffle=True, collate_fn=dataset.collate)
     val_loader = DataLoader(valset, batch_size=params['batch_size'], shuffle=False, collate_fn=dataset.collate)
@@ -278,8 +278,6 @@ def main():
         config['gpu']['id'] = int(args.gpu_id)
         config['gpu']['use'] = True
     device = gpu_setup(config['gpu']['use'], config['gpu']['id'])
-    # event
-    dates, embeddings, graph_adj, graph_sim = process.get_event_info()
     # model, dataset, out_dir
     if args.model is not None:
         MODEL_NAME = args.model

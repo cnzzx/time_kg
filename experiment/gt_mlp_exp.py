@@ -102,6 +102,7 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
         print('Time taken to convert to full graphs:',time.time()-st)    
         
     trainset, valset, testset = dataset.train, dataset.val, dataset.test
+    event_graph = dataset.event_dgl
         
     root_log_dir, root_ckpt_dir, write_file_name, write_config_file = dirs
     device = net_params['device']
@@ -140,9 +141,9 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
     # import train and evaluate functions
     from experiment.train_gt_mlp import train_epoch, evaluate_network
 
-    train_loader = DataLoader(trainset, batch_size=params['batch_size'], shuffle=True, collate_fn=dataset.collate)
-    val_loader = DataLoader(valset, batch_size=params['batch_size'], shuffle=False, collate_fn=dataset.collate)
-    test_loader = DataLoader(testset, batch_size=params['batch_size'], shuffle=False, collate_fn=dataset.collate)
+    train_loader = DataLoader(trainset, batch_size=params['batch_size'], shuffle=True)
+    val_loader = DataLoader(valset, batch_size=params['batch_size'], shuffle=False)
+    test_loader = DataLoader(testset, batch_size=params['batch_size'], shuffle=False)
     
     # At any point you can hit Ctrl + C to break out of training early.
     try:

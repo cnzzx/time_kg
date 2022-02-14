@@ -257,9 +257,6 @@ class MoleculeDataset(torch.utils.data.Dataset):
         with open(data_dir+name+'.pkl',"rb") as f:
             f = pickle.load(f)
             self.train = f[0]
-            print('--------------------------')
-            print(self.train)
-            print('--------------------------')
             self.val = f[1]
             self.test = f[2]
             self.num_atom_type = f[3]
@@ -271,11 +268,19 @@ class MoleculeDataset(torch.utils.data.Dataset):
 
     # form a mini batch from a given list of samples = [(graph, label) pairs]
     def collate(self, samples):
+        print('----------------------------')
+        print(len(samples))
+        print(samples[0])
+        print('----------------------------')
         # The input samples is a list of pairs (graph, label).
         graphs, labels = map(list, zip(*samples))
         # labels = torch.tensor(np.array(labels)).unsqueeze(1)
         labels = torch.tensor(labels).unsqueeze(1)
-        batched_graph = dgl.batch(graphs)       
+        batched_graph = dgl.batch(graphs)
+        print('----------------------------')
+        print(labels.size())
+        print(batched_graph)
+        print('----------------------------')
         
         return batched_graph, labels
     

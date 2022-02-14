@@ -95,6 +95,9 @@ def wl_positional_encoding(g):
 
 
 class FinancialDataset(torch.utils.data.Dataset):
+    """
+        Time series dataset including multiple series slices.
+    """
     def __init__(self, input_seqs, output_seqs):
         self.input_seqs = input_seqs
         self.output_seqs = output_seqs
@@ -107,27 +110,11 @@ class FinancialDataset(torch.utils.data.Dataset):
         return self.n_samples
 
 
-class EventDGL():
-    def __init__(self, dates, embeddings, graph_adj, graph_sim):
-        # Build DGL graph based on those infos.
-        # Create the DGL graph.
-        n_nodes = graph_adj.size()[0]  # 930 for the financial events collected
-        self.g = dgl.DGLGraph()
-        self.g.add_nodes(n_nodes)
-
-        # Build the graph based on graph_adj.
-        for u in range(n_nodes):
-            for v in range(n_nodes):
-                if graph_adj[u, v] > 0:
-                    self.g.add_edge(u, v)
-        
-        # Set vertex and edge features.
-        self.g.ndata['embedding'] = embeddings
-        self.g.ndata['date'] = dates
-        self.g.edata['similarity'] = graph_sim
-
-
 class FinancialDatapack():
+    """
+        Include trainning, validation and testing series slices
+        and event graph.
+    """
     def __init__(self, name, input_step_len=5, output_step_len=10, test_ratio=0.2, val_ratio=0.2):
         start = time.time()
         print("[I] Loading dataset %s..." % (name))
@@ -164,7 +151,24 @@ class FinancialDatapack():
         self.test = FinancialDataset(test_input, test_output)
 
         # load graph data
-        self.event_dgl = EventDGL(eprocess.get_event_info())
+        dates, embeddings, graph_adj, graph_sim = eprocess.get_event_info()
+
+        # Build DGL graph based on those infos.
+        # Create the DGL graph.
+        n_nodes = graph_adj.size()[0]  # 930 for the financial events collected
+        self.event_dgl = dgl.DGLGraph()
+        self.event_dgl.add_nodes(n_nodes)
+
+        # Build the graph based on graph_adj.
+        for u in range(n_nodes):
+            for v in range(n_nodes):
+                if graph_adj[u, v] > 0:
+                    self.event_dgl.add_edge(u, v)
+        
+        # Set vertex and edge features.
+        self.event_dgl.ndata['feat'] = embeddings
+        self.event_dgl.ndata['date'] = dates
+        self.event_dgl.edata['feat'] = graph_sim
 
         print('train, test, val sizes :',self.train_input.size()[0],self.test_input.size()[0],self.val_input.size()[0])
         print("[I] Finished loading.")
@@ -182,8 +186,8 @@ class FinancialDatapack():
     
     def _add_laplacian_positional_encodings(self, pos_enc_dim):
         # Graph positional encoding v/ Laplacian eigenvectors
-        self.event_dgl.g = laplacian_positional_encoding(self.event_dgl.g, pos_enc_dim)
+        self.event_dgl = laplacian_positional_encoding(self.event_dgl, pos_enc_dim)
 
     def _add_wl_positional_encodings(self):
         # WL positional encoding from Graph-Bert, Zhang et al 2020.
-        self.event_dgl.g = wl_positional_encoding(self.event_dgl.g)
+        self.event_dgl = wl_positional_encoding(self.event_dgl)

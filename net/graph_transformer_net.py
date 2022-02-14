@@ -5,17 +5,13 @@ import torch.nn.functional as F
 import dgl
 
 """
-Graph Transformer with edge features
+    Graph Transformer with edge features
+    
 """
 from layers.graph_transformer_edge_layer import GraphTransformerLayer
 from layers.mlp_readout_layer import MLPReadout
 
-
-def get_time_bucket(date, time_gap):
-    return (date-1) // time_gap + 1
-
-
-class GT_MLPNet(nn.Module):
+class GraphTransformerNet(nn.Module):
     def __init__(self, net_params):
         super().__init__()
         num_atom_type = net_params['num_atom_type']
@@ -54,23 +50,10 @@ class GT_MLPNet(nn.Module):
         self.layers = nn.ModuleList([ GraphTransformerLayer(hidden_dim, hidden_dim, num_heads, dropout,
                                                     self.layer_norm, self.batch_norm, self.residual) for _ in range(n_layers-1) ]) 
         self.layers.append(GraphTransformerLayer(hidden_dim, out_dim, num_heads, dropout, self.layer_norm, self.batch_norm, self.residual))
-        
-        self.fn_embedding_h = nn.Linear(out_dim, 1)  # embedding the final event vector to scalar
-        self.fn_embedding_xh = nn.Linear(2, 1)
-
         self.MLP_layer = MLPReadout(out_dim, 1)   # 1 out dim since regression problem        
         
-    def forward(self, g, h, e, x, h_lap_pos_enc=None, h_wl_pos_enc=None):
-        """
-        g: the graph structure
-        g.ndata: the vertex feature dict
-                 There should be the:
-                 - start date of one event (g.ndata['sd'])
-        g.edata: the edge feature dict
-        h: vertex features
-        e: edge features. For financial events, these represents the semantic similarity.
-        x: the time series
-        """
+    def forward(self, g, h, e, h_lap_pos_enc=None, h_wl_pos_enc=None):
+
         # input embedding
         h = self.embedding_h(h)
         h = self.in_feat_dropout(h)
@@ -88,33 +71,18 @@ class GT_MLPNet(nn.Module):
         for conv in self.layers:
             h, e = conv(g, h, e)
         g.ndata['h'] = h
-
-        # do the influence computing
-        # this module makes SGDs almost the only proper optimization method
         
-        k = 0.25
-        time_gap = 7
-        start_bucket, end_bucket = 1, 1
-        # Only consider events whose influence can cover the time slice.
-        event_influence = torch.zeros((end_bucket - start_bucket + 1), requires_grad=True)
-        event_dates = g.ndata['sd']
-        n_events = event_dates.size()[0]
-        influence_span = int(1 / k)
-        for event_idx in range(n_events):
-            event_bucket = get_time_bucket(event_dates[event_idx], time_gap)
-            if event_bucket + influence_span - 1 < start_bucket:
-                continue
-            if event_bucket + influence_span - 1 > end_bucket:
-                break
-            # Binary search might be faster but I guess it's not so important
-            # even the events considered are very sparse for one sample.
-            for inf_dis in range(influence_span):
-                event_influence[event_bucket + inf_dis] += (1 - k * inf_dis) * h[event_idx]
-                # linear degradation
-        enhanced_series = torch.cat((x, event_influence), axis=0)
-        enhanced_series = self.fn_embedding_xh(enhanced_series)
-
-        return self.MLP_layer(enhanced_series)
+        if self.readout == "sum":
+            hg = dgl.sum_nodes(g, 'h')
+        elif self.readout == "max":
+            hg = dgl.max_nodes(g, 'h')
+        elif self.readout == "mean":
+            hg = dgl.mean_nodes(g, 'h')
+        else:
+            hg = dgl.mean_nodes(g, 'h')  # default readout is mean nodes
+        
+        return 0
+        # return self.MLP_layer(hg)
         
     def loss(self, scores, targets):
         # loss = nn.MSELoss()(scores,targets)

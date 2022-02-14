@@ -1,1 +1,1 @@
-python ./experiment/gt_mlp_exp.py --gpu_id 0 --config ./configs/molecules_GraphTransformer_LapPE_ZINC_500k_sparse_graph_BN.json
+python ./experiment/molecules_exp.py --gpu_id 0 --config ./configs/molecules_GraphTransformer_LapPE_ZINC_500k_sparse_graph_BN.json

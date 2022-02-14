@@ -98,13 +98,14 @@ class FinancialDataset(torch.utils.data.Dataset):
     """
         Time series dataset including multiple series slices.
     """
-    def __init__(self, input_seqs, output_seqs):
+    def __init__(self, input_seqs, output_seqs, start_buckets):
         self.input_seqs = input_seqs
         self.output_seqs = output_seqs
+        self.start_buckets = start_buckets
         self.n_samples = input_seqs.size()[0]
 
     def __getitem__(self, index):
-        return self.input_seqs[index], self.output_seqs[index]
+        return self.input_seqs[index], self.output_seqs[index], self.start_buckets[index]
     
     def __len__(self):
         return self.n_samples
@@ -115,12 +116,27 @@ class FinancialDatapack():
         Include trainning, validation and testing series slices
         and event graph.
     """
-    def __init__(self, name, input_step_len=5, output_step_len=10, test_ratio=0.2, val_ratio=0.2):
+    def __init__(self, name, time_gap=7, input_step_len=5, output_step_len=10, test_ratio=0.2, val_ratio=0.2):
         start = time.time()
         print("[I] Loading dataset %s..." % (name))
         self.name = name
-        data_path = 'data/datasets/' + name + '.csv'
-        input_seqs, output_seqs = load.make_dataset(load.load_data(data_path, name), input_step_len, output_step_len, k=0.25)
+        data_path = 'data/dataset/' + name + '.csv'
+        raw_input_seqs, raw_output_seqs = load.make_dataset(load.data_filter(load.load_data(data_path, name), time_gap=time_gap), input_step_len, output_step_len, k=0.25)
+
+        # save the start bucket, and then we can ignore the absolute bucket
+        start_buckets = []
+        input_seqs, output_seqs = [], []
+        for sample_seq in raw_input_seqs:
+            values_ls = []
+            start_buckets.append(sample_seq[0][0])
+            for idx in range(input_step_len):
+                values_ls.append(sample_seq[idx][1])  # only save the value and ignore the time bucket
+            input_seqs.append(values_ls.copy())
+        for sample_seq in raw_output_seqs:
+            values_ls = []
+            for idx in range(output_step_len):
+                values_ls.append(sample_seq[idx][1])  # only save the value and ignore the time bucket
+            output_seqs.append(values_ls.copy())
 
         # shuffling
         # avoid data distribution offset
@@ -133,9 +149,9 @@ class FinancialDatapack():
             temp = output_seqs[another_idx].copy()
             output_seqs[another_idx] = output_seqs[shuffle_idx].copy()
             output_seqs[shuffle_idx] = temp.copy()
-
-        self.num_vertex_type = 1
-        self.num_edge_type = 1
+            temp = start_buckets[another_idx]
+            start_buckets[shuffle_idx] = start_buckets[another_idx]
+            start_buckets[another_idx] = temp
 
         # divide the dataset into training, validation and testing sets
         train_input = torch.tensor(input_seqs[:int(n_samples*(1-test_ratio)*(1-val_ratio))])
@@ -146,31 +162,58 @@ class FinancialDatapack():
         val_output = torch.tensor(output_seqs[int(n_samples*(1-test_ratio)*(1-val_ratio)):int(n_samples*(1-test_ratio))])
         test_output = torch.tensor(output_seqs[int(n_samples*(1-test_ratio)):])
 
-        self.train = FinancialDataset(train_input, train_output)
-        self.val = FinancialDataset(val_input, val_output)
-        self.test = FinancialDataset(test_input, test_output)
+        train_start = torch.tensor(start_buckets[:int(n_samples*(1-test_ratio)*(1-val_ratio))])
+        val_start = torch.tensor(start_buckets[int(n_samples*(1-test_ratio)*(1-val_ratio)):int(n_samples*(1-test_ratio))])
+        test_start = torch.tensor(start_buckets[int(n_samples*(1-test_ratio)):])
+
+        self.train = FinancialDataset(train_input, train_output, train_start)
+        self.val = FinancialDataset(val_input, val_output, val_start)
+        self.test = FinancialDataset(test_input, test_output, test_start)
+
+        print('------------------------------------------------------')
+        print('Time series data prepared.')
+        print('train size: ', train_input.size()[0])
+        print('val size: ', val_input.size()[0])
+        print('test size: ', test_input.size()[0])
+        print('------------------------------------------------------')
 
         # load graph data
-        dates, embeddings, graph_adj, graph_sim = eprocess.get_event_info()
+        dates, embeddings, graph_adj, graph_sim = eprocess.get_event_info(time_gap)
+
+        print('------------------------------------------------------')
+        print('Event graph data prepared.')
+        print('dates size: ', dates.size())
+        print('embeddings size: ', embeddings.size())
+        print('graph_adj size: ', graph_adj.size())
+        print('graph_sim size: ', graph_sim.size())
+        print('------------------------------------------------------')
 
         # Build DGL graph based on those infos.
         # Create the DGL graph.
         n_nodes = graph_adj.size()[0]  # 930 for the financial events collected
-        self.event_dgl = dgl.DGLGraph()
-        self.event_dgl.add_nodes(n_nodes)
 
-        # Build the graph based on graph_adj.
+        u_list, v_list, sim_list = [], [], []
         for u in range(n_nodes):
             for v in range(n_nodes):
                 if graph_adj[u, v] > 0:
-                    self.event_dgl.add_edge(u, v)
+                    u_list.append(u)
+                    v_list.append(v)
+                    sim_list.append(graph_sim[u, v])
+        u_tensor = torch.tensor(u_list, dtype=torch.int32)
+        v_tensor = torch.tensor(v_list, dtype=torch.int32)
+        sim_tensor = torch.tensor(sim_list).unsqueeze(1)
+
+        self.event_dgl = dgl.graph((u_tensor, v_tensor), num_nodes=n_nodes)
         
         # Set vertex and edge features.
         self.event_dgl.ndata['feat'] = embeddings
-        self.event_dgl.ndata['date'] = dates
-        self.event_dgl.edata['feat'] = graph_sim
+        self.event_dgl.ndata['date'] = dates.unsqueeze(1)
+        self.event_dgl.edata['feat'] = sim_tensor
 
-        print('train, test, val sizes :',self.train_input.size()[0],self.test_input.size()[0],self.val_input.size()[0])
+        print(self.event_dgl.ndata['feat'].size())
+        print(self.event_dgl.ndata['date'].size())
+        print(self.event_dgl.edata['feat'].size())
+
         print("[I] Finished loading.")
         print("[I] Data load time: {:.4f}s".format(time.time()-start))
     

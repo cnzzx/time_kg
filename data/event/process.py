@@ -67,7 +67,7 @@ def event_graph_pro():
     num_1=0 # 边的数量
     for i in range(930):
         for j in range(930):
-            if B_sim[i][j]>0.85:
+            if B_sim[i][j]>0.9:
                 C_adj[i][j]=1
                 num_1+=1
     np.savetxt('data/event/C_adj.csv', C_adj, delimiter = ',')
@@ -87,15 +87,18 @@ def get_absolute_date(year, month, day):
     return result
 
 
-def get_event_info():
-    embeddings = []
-    dates = []
-    
+def get_time_bucket(date, time_gap):
+    return (date-1) // time_gap + 1
+
+
+def get_event_info(time_gap):
     with open('data/event/embedding.txt', 'r', encoding='utf-8') as f:
         eb_lines = f.readlines()
     with open('data/event/title.txt', 'r', encoding='utf-8') as f:
         ti_lines = f.readlines()
     n_lines = len(eb_lines)
+    embeddings = torch.zeros((n_lines, 768))
+    dates = torch.zeros((n_lines), dtype=torch.int32)
     for line_idx in range(n_lines):
         eb_line = eb_lines[line_idx]
         eb_line = eb_line.strip('\n')
@@ -103,7 +106,7 @@ def get_event_info():
         eb_list = eb_line.split(" ")
         for eb_idx in range(768):
             eb_list[eb_idx] = eval(eb_list[eb_idx])
-        embeddings.append(torch.tensor(eb_list))
+        embeddings[line_idx] = torch.tensor(eb_list)
 
         ti_line = ti_lines[line_idx]
         ti_line = ti_line.strip('\n')
@@ -112,19 +115,17 @@ def get_event_info():
         date_ls = date.split('-')
         for date_idx in range(3):
             date_ls[date_idx] = int(date_ls[date_idx])
-        dates.append(get_absolute_date(*(date_ls)))
-    embeddings = torch.tensor(embeddings)
-    dates = torch.tensor(dates, dtype=torch.int32)
+        dates[line_idx] = get_time_bucket(get_absolute_date(*(date_ls)), time_gap)
     
     # sort - dates in ascending order
     n_events = len(dates)
-    p_idx = torch.arange(0, n_events-1, 1)
+    p_idx = torch.arange(0, n_events, 1)
     for i in range(n_events-1):
         for j in range(n_events-i-1):
             if dates[p_idx[j]] > dates[p_idx[j+1]]:
-                t = p_idx[j]
-                p_idx[j] = p_idx[j+1]
-                p_idx[j+1] = t
+                t = p_idx[j].clone()
+                p_idx[j] = p_idx[j+1].clone()
+                p_idx[j+1] = t.clone()
     graph_adj = torch.tensor(np.loadtxt('data/event/C_adj.csv', delimiter=','))  # The graph sturcture.
     graph_sim = torch.tensor(np.loadtxt('data/event/B_sim.csv', delimiter=','))  # The edge features.
 
@@ -135,16 +136,16 @@ def get_event_info():
 
     for i in range(n_events):
         sorted_embeddings[i] = embeddings[p_idx[i]]
-        sorted_dates = dates[p_idx[i]]
+        sorted_dates[i] = dates[p_idx[i]]
         for j in range(n_events):
             sorted_graph_adj[i][j] = graph_adj[p_idx[i], p_idx[j]]
             sorted_graph_sim[i][j] = graph_sim[p_idx[i], p_idx[j]]
-    
+
     return sorted_dates, sorted_embeddings, sorted_graph_adj, sorted_graph_sim
 
 
 if __name__== '__main__':
     # event_source_pro()
-    # event_graph_pro()
-    dates, embeddings, graph_adj, graph_sim = get_event_info()
-    print(graph_adj.size(), graph_sim.size())
+    event_graph_pro()
+    # dates, embeddings, graph_adj, graph_sim = get_event_info()
+    # print(graph_adj.size(), graph_sim.size())

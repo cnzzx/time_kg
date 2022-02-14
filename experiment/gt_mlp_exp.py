@@ -154,10 +154,10 @@ def train_val_pipeline(MODEL_NAME, dataset, params, net_params, dirs):
 
                 start = time.time()
 
-                epoch_train_loss, epoch_train_mae, optimizer = train_epoch(model, optimizer, device, train_loader, epoch)
+                epoch_train_loss, epoch_train_mae, optimizer = train_epoch(model, optimizer, device, train_loader, event_graph, epoch)
                     
-                epoch_val_loss, epoch_val_mae = evaluate_network(model, device, val_loader, epoch)
-                _, epoch_test_mae = evaluate_network(model, device, test_loader, epoch)
+                epoch_val_loss, epoch_val_mae = evaluate_network(model, device, val_loader, event_graph, epoch)
+                _, epoch_test_mae = evaluate_network(model, device, test_loader, event_graph, epoch)
                 
                 epoch_train_losses.append(epoch_train_loss)
                 epoch_val_losses.append(epoch_val_loss)
@@ -237,7 +237,6 @@ def main():
     """
         USER CONTROLS
     """
-    
     
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', help="Please give a config.json file with training/model/data/param details")
@@ -353,9 +352,6 @@ def main():
         
     
     # nasdaq100
-    net_params['num_atom_type'] = dataset.num_atom_type
-    net_params['num_bond_type'] = dataset.num_bond_type
-
     
     root_log_dir = out_dir + 'logs/' + MODEL_NAME + "_" + DATASET_NAME + "_GPU" + str(config['gpu']['id']) + "_" + time.strftime('%Hh%Mm%Ss_on_%b_%d_%Y')
     root_ckpt_dir = out_dir + 'checkpoints/' + MODEL_NAME + "_" + DATASET_NAME + "_GPU" + str(config['gpu']['id']) + "_" + time.strftime('%Hh%Mm%Ss_on_%b_%d_%Y')

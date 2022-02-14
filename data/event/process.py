@@ -113,6 +113,8 @@ def get_event_info():
         for date_idx in range(3):
             date_ls[date_idx] = int(date_ls[date_idx])
         dates.append(get_absolute_date(*(date_ls)))
+    embeddings = torch.tensor(embeddings)
+    dates = torch.tensor(dates, dtype=torch.int32)
     
     # sort - dates in ascending order
     n_events = len(dates)
@@ -123,10 +125,22 @@ def get_event_info():
                 t = p_idx[j]
                 p_idx[j] = p_idx[j+1]
                 p_idx[j+1] = t
-    
     graph_adj = torch.tensor(np.loadtxt('data/event/C_adj.csv', delimiter=','))  # The graph sturcture.
     graph_sim = torch.tensor(np.loadtxt('data/event/B_sim.csv', delimiter=','))  # The edge features.
-    return dates, embeddings, graph_adj, graph_sim
+
+    sorted_embeddings = torch.zeros(embeddings.size())
+    sorted_dates = torch.zeros(dates.size(), dtype=torch.int32)
+    sorted_graph_adj = torch.zeros(graph_adj.size(), dtype=torch.int32)
+    sorted_graph_sim = torch.zeros(graph_sim.size())
+
+    for i in range(n_events):
+        sorted_embeddings[i] = embeddings[p_idx[i]]
+        sorted_dates = dates[p_idx[i]]
+        for j in range(n_events):
+            sorted_graph_adj[i][j] = graph_adj[p_idx[i], p_idx[j]]
+            sorted_graph_sim[i][j] = graph_sim[p_idx[i], p_idx[j]]
+    
+    return sorted_dates, sorted_embeddings, sorted_graph_adj, sorted_graph_sim
 
 
 if __name__== '__main__':

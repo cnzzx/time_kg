@@ -34,7 +34,8 @@ class GT_MLPNet(nn.Module):
         self.device = net_params['device']
         self.lap_pos_enc = net_params['lap_pos_enc']
         self.wl_pos_enc = net_params['wl_pos_enc']
-        max_wl_role_index = 37 # this is maximum graph size in the dataset
+        # max_wl_role_index = 37 # this is maximum graph size in the dataset
+        max_wl_role_index = 930 # this is maximum graph size in the dataset
         
         if self.lap_pos_enc:
             pos_enc_dim = net_params['pos_enc_dim']

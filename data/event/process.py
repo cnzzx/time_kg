@@ -114,6 +114,16 @@ def get_event_info():
             date_ls[date_idx] = int(date_ls[date_idx])
         dates.append(get_absolute_date(*(date_ls)))
     
+    # sort - dates in ascending order
+    n_events = len(dates)
+    p_idx = torch.arange(0, n_events-1, 1)
+    for i in range(n_events-1):
+        for j in range(n_events-i-1):
+            if dates[p_idx[j]] > dates[p_idx[j+1]]:
+                t = p_idx[j]
+                p_idx[j] = p_idx[j+1]
+                p_idx[j+1] = t
+    
     graph_adj = torch.tensor(np.loadtxt('data/event/C_adj.csv', delimiter=','))  # The graph sturcture.
     graph_sim = torch.tensor(np.loadtxt('data/event/B_sim.csv', delimiter=','))  # The edge features.
     return dates, embeddings, graph_adj, graph_sim

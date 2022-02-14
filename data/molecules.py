@@ -257,6 +257,9 @@ class MoleculeDataset(torch.utils.data.Dataset):
         with open(data_dir+name+'.pkl',"rb") as f:
             f = pickle.load(f)
             self.train = f[0]
+            print('--------------------------')
+            print(self.train)
+            print('--------------------------')
             self.val = f[1]
             self.test = f[2]
             self.num_atom_type = f[3]
@@ -293,55 +296,6 @@ class MoleculeDataset(torch.utils.data.Dataset):
         self.train.graph_lists = [make_full_graph(g) for g in self.train.graph_lists]
         self.val.graph_lists = [make_full_graph(g) for g in self.val.graph_lists]
         self.test.graph_lists = [make_full_graph(g) for g in self.test.graph_lists]
-    
-    
-    def _add_laplacian_positional_encodings(self, pos_enc_dim):
-        
-        # Graph positional encoding v/ Laplacian eigenvectors
-        self.train.graph_lists = [laplacian_positional_encoding(g, pos_enc_dim) for g in self.train.graph_lists]
-        self.val.graph_lists = [laplacian_positional_encoding(g, pos_enc_dim) for g in self.val.graph_lists]
-        self.test.graph_lists = [laplacian_positional_encoding(g, pos_enc_dim) for g in self.test.graph_lists]
-
-    def _add_wl_positional_encodings(self):
-        
-        # WL positional encoding from Graph-Bert, Zhang et al 2020.
-        self.train.graph_lists = [wl_positional_encoding(g) for g in self.train.graph_lists]
-        self.val.graph_lists = [wl_positional_encoding(g) for g in self.val.graph_lists]
-        self.test.graph_lists = [wl_positional_encoding(g) for g in self.test.graph_lists]
-
-
-class FinancialDataset(torch.utils.data.Dataset):
-    def __init__(self, name, input_step_len, output_step_len):
-        start = time.time()
-        print("[I] Loading dataset %s..." % (name))
-        self.name = name
-        data_path = 'data/datasets/' + name + '.csv'
-        input_seq, output_seq = load.make_dataset(load.load_data(data_path, name), input_step_len, output_step_len, k=0.25)
-        self.num_vertex_type = 1
-        self.num_edge_type = 1
-
-        # divide the dataset into training, validation and testing sets
-        self.train = ...
-        self.val = ...
-        self.test = ...
-
-        # load graph data
-        dates, embeddings, graph_adj, graph_sim = eprocess.get_event_info()
-
-        print('train, test, val sizes :',len(self.train),len(self.test),len(self.val))
-        print("[I] Finished loading.")
-        print("[I] Data load time: {:.4f}s".format(time.time()-start))
-
-
-    # form a mini batch from a given list of samples = [(graph, label) pairs]
-    def collate(self, samples):
-        # The input samples is a list of pairs (graph, label).
-        graphs, labels = map(list, zip(*samples))
-        # labels = torch.tensor(np.array(labels)).unsqueeze(1)
-        labels = torch.tensor(labels).unsqueeze(1)
-        batched_graph = dgl.batch(graphs)       
-        
-        return batched_graph, labels
     
     
     def _add_laplacian_positional_encodings(self, pos_enc_dim):

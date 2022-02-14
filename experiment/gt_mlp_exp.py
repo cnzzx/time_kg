@@ -352,7 +352,7 @@ def main():
         net_params['wl_pos_enc'] = True if args.pos_enc=='True' else False
         
     
-    # ZINC
+    # nasdaq100
     net_params['num_atom_type'] = dataset.num_atom_type
     net_params['num_bond_type'] = dataset.num_bond_type
 

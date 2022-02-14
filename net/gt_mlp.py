@@ -60,7 +60,7 @@ class GT_MLPNet(nn.Module):
 
         self.MLP_layer = MLPReadout(out_dim, 1)   # 1 out dim since regression problem        
         
-    def forward(self, g, h, e, x, h_lap_pos_enc=None, h_wl_pos_enc=None):
+    def forward(self, g, h, e, x, start_bucket, end_bucket, k=0.25, time_gap=7, h_lap_pos_enc=None, h_wl_pos_enc=None):
         """
         g: the graph structure
         g.ndata: the vertex feature dict
@@ -70,6 +70,9 @@ class GT_MLPNet(nn.Module):
         h: vertex features
         e: edge features. For financial events, these represents the semantic similarity.
         x: the time series
+        start_bucket: the start time bucket of input time series
+        end_bucket: the end time bucket of output time series
+                    the length of x is less than (end_bucket-start_bucket+1)
         """
         # input embedding
         h = self.embedding_h(h)
@@ -92,9 +95,8 @@ class GT_MLPNet(nn.Module):
         # do the influence computing
         # this module makes SGDs almost the only proper optimization method
         
-        k = 0.25
-        time_gap = 7
-        start_bucket, end_bucket = 1, 1
+        input_seq_len = x.size()[0]
+        output_seq_len = (end_bucket-start_bucket+1) - input_seq_len
         # Only consider events whose influence can cover the time slice.
         event_influence = torch.zeros((end_bucket - start_bucket + 1), requires_grad=True)
         event_dates = g.ndata['sd']
@@ -109,12 +111,12 @@ class GT_MLPNet(nn.Module):
             # Binary search might be faster but I guess it's not so important
             # even the events considered are very sparse for one sample.
             for inf_dis in range(influence_span):
-                event_influence[event_bucket + inf_dis] += (1 - k * inf_dis) * h[event_idx]
+                event_influence[event_bucket + inf_dis - start_bucket] += (1 - k * inf_dis) * h[event_idx]
                 # linear degradation
-        enhanced_series = torch.cat((x, event_influence), axis=0)
+        enhanced_series = torch.cat((x, event_influence[:input_seq_len]), axis=0)
         enhanced_series = self.fn_embedding_xh(enhanced_series)
-
-        return self.MLP_layer(enhanced_series)
+        final_feat = torch.cat((enhanced_series, event_influence[input_seq_len:]), axis=1)
+        return self.MLP_layer(final_feat)
         
     def loss(self, scores, targets):
         # loss = nn.MSELoss()(scores,targets)

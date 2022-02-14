@@ -173,16 +173,6 @@ class FinancialDatapack():
         print('train, test, val sizes :',self.train_input.size()[0],self.test_input.size()[0],self.val_input.size()[0])
         print("[I] Finished loading.")
         print("[I] Data load time: {:.4f}s".format(time.time()-start))
-
-    # form a mini batch from a given list of samples = [(graph, label) pairs]
-    def collate(self, samples):
-        # The input samples is a list of pairs (graph, label).
-        graphs, labels = map(list, zip(*samples))
-        # labels = torch.tensor(np.array(labels)).unsqueeze(1)
-        labels = torch.tensor(labels).unsqueeze(1)
-        batched_graph = dgl.batch(graphs)
-        
-        return batched_graph, labels
     
     def _add_laplacian_positional_encodings(self, pos_enc_dim):
         # Graph positional encoding v/ Laplacian eigenvectors
